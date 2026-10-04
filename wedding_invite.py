@@ -177,7 +177,7 @@ TEMPLATE = r'''<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="invite-version" content="curtains-v3">
+<meta name="invite-version" content="curtains-v4">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{groom}} &amp; {{bride}} · Wedding Invitation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -637,6 +637,7 @@ footer .script{font-family:"Great Vibes",cursive;font-size:56px;margin:8px 0}
     <p style="margin:0">With love and blessings of our families</p>
     <p class="script foil"><span data-k="groom">{{groom}}</span> &amp; <span data-k="bride">{{bride}}</span></p>
     <p data-k="dateText">{{dateText}}</p>
+    <p style="font-size:11px;opacity:.45;margin-top:18px">v4</p>
   </footer>
 </main>
 
@@ -697,11 +698,18 @@ const CONFIG=__CONFIG_JSON__;
 
   /* Palace doors */
   const intro=$('#intro'),gate=$('#gate'),hero=$('#home'),nav=$('#nav');let opened=false;
+  const openCurtains=()=>{
+    hero.classList.add('opened');
+    const k=innerWidth<=600?.2:.3;
+    document.querySelectorAll('.drape').forEach(d=>{d.style.webkitTransition='-webkit-transform 2.4s cubic-bezier(.6,0,.2,1)';d.style.transition='transform 2.4s cubic-bezier(.6,0,.2,1)';
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{d.style.webkitTransform='scaleX('+k+')';d.style.transform='scaleX('+k+')';}));});
+    setTimeout(()=>{document.querySelectorAll('.drape').forEach(d=>{if(d.getBoundingClientRect().width>innerWidth*.4){d.style.transition='none';d.style.transform='scaleX('+k+')';d.style.webkitTransform='scaleX('+k+')';}});},3200);
+  };
   const openDoors=()=>{
     if(opened)return;opened=true;document.getElementById('openToggle').checked=true;
     setTimeout(()=>{gate.classList.add('open');intro.classList.add('opening');
       const r=gate.getBoundingClientRect();burst(r.left+r.width/2,r.top+r.height*.45,90);},reduce?0:60);
-    setTimeout(()=>{intro.classList.add('gone');hero.classList.add('opened');},reduce?0:2300);
+    setTimeout(()=>{intro.classList.add('gone');openCurtains();},reduce?0:2300);
     setTimeout(()=>{intro.hidden=true;document.body.classList.remove('locked');},reduce?0:3400);
   };
   intro.addEventListener('click',e=>{e.preventDefault();openDoors();});
