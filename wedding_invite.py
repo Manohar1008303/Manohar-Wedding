@@ -177,7 +177,7 @@ TEMPLATE = r'''<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="invite-version" content="curtains-v4">
+<meta name="invite-version" content="curtains-v5">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{groom}} &amp; {{bride}} · Wedding Invitation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -288,13 +288,14 @@ h2{font-family:"Great Vibes",cursive;font-weight:400;font-size:clamp(44px,11vw,6
 .valance{position:absolute;top:0;left:0;right:0;height:54px;z-index:6;background:
   radial-gradient(circle at 50% 0,#5b3c94 24px,transparent 25px) 0 16px/50px 50px repeat-x,linear-gradient(#5b3c94,#6c4aa8);background-size:50px 50px,100% 30px;background-repeat:repeat-x,no-repeat;box-shadow:0 6px 16px rgba(0,0,0,.35)}
 .valance::after{content:"";position:absolute;left:0;right:0;top:27px;height:3px;background:var(--foil);background-size:300% auto;animation:foil 6s linear infinite}
-.drape{position:absolute;top:0;bottom:0;width:51%;z-index:5;transition:transform 2.4s cubic-bezier(.6,0,.2,1);will-change:transform;-webkit-transform:translateZ(0);transform:translateZ(0);
+.drape{position:absolute;top:0;bottom:0;width:51%;z-index:5;transition:width 2.4s cubic-bezier(.6,0,.2,1);
   background:linear-gradient(90deg,rgba(255,255,255,.08),rgba(0,0,0,.2)),repeating-linear-gradient(90deg,#4b2f7d 0 12px,#7356b0 12px 22px,#a58ad6 22px 25px,#6a4ba5 25px 34px,#3e2669 34px 46px)}
 .drape::after{content:"";position:absolute;left:0;right:0;bottom:0;height:22px;background:repeating-linear-gradient(90deg,#d9b465 0 2px,transparent 2px 5px);opacity:.8}
-.drape.l{left:0;transform-origin:0 50%;-webkit-transform-origin:0 50%}
-.drape.r{right:0;transform-origin:100% 50%;-webkit-transform-origin:100% 50%}
-:is(.hero.opened,#openToggle:checked~main .hero) .drape{transform:scaleX(.3);-webkit-transform:scaleX(.3)}
-@media (max-width:600px){:is(.hero.opened,#openToggle:checked~main .hero) .drape{transform:scaleX(.2);-webkit-transform:scaleX(.2)}}
+.drape.l{left:0}
+.drape.r{right:0}
+/* curtains open by animating width (not transform): iPhone Safari can skip repainting a transformed drape */
+:is(.hero.opened,#openToggle:checked~main .hero) .drape{width:15.3%}
+@media (max-width:600px){:is(.hero.opened,#openToggle:checked~main .hero) .drape{width:10.2%}}
 #openToggle:checked~main .hero .drape{transition-delay:2.3s}
 .tie{position:absolute;top:56%;z-index:7;width:34px;height:12px;border-radius:6px;background:var(--foil);background-size:300% auto;animation:foil 5s linear infinite;opacity:0;transition:opacity .6s 2s;box-shadow:0 0 12px rgba(246,227,168,.6)}
 .tie.l{left:4.5%}.tie.r{right:4.5%}
@@ -700,10 +701,10 @@ const CONFIG=__CONFIG_JSON__;
   const intro=$('#intro'),gate=$('#gate'),hero=$('#home'),nav=$('#nav');let opened=false;
   const openCurtains=()=>{
     hero.classList.add('opened');
-    const k=innerWidth<=600?.2:.3;
-    document.querySelectorAll('.drape').forEach(d=>{d.style.webkitTransition='-webkit-transform 2.4s cubic-bezier(.6,0,.2,1)';d.style.transition='transform 2.4s cubic-bezier(.6,0,.2,1)';
-      requestAnimationFrame(()=>requestAnimationFrame(()=>{d.style.webkitTransform='scaleX('+k+')';d.style.transform='scaleX('+k+')';}));});
-    setTimeout(()=>{document.querySelectorAll('.drape').forEach(d=>{if(d.getBoundingClientRect().width>innerWidth*.4){d.style.transition='none';d.style.transform='scaleX('+k+')';d.style.webkitTransform='scaleX('+k+')';}});},3200);
+    const w=innerWidth<=600?'10.2%':'15.3%';
+    document.querySelectorAll('.drape').forEach(d=>{d.style.transition='width 2.4s cubic-bezier(.6,0,.2,1)';
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{d.style.width=w;}));});
+    setTimeout(()=>{document.querySelectorAll('.drape').forEach(d=>{if(d.getBoundingClientRect().width>innerWidth*.4){d.style.transition='none';d.style.width=w;}});},3200);
   };
   const openDoors=()=>{
     if(opened)return;opened=true;document.getElementById('openToggle').checked=true;
