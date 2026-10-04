@@ -1,10 +1,185 @@
-<!doctype html>
+"""
+Wedding invite - Manohar & Dhanashri
+=====================================
+
+ONE-TIME: put this file in your Manohar-Wedding folder and click Run in VS Code
+(or: python3 wedding_invite.py). Leave it running.
+
+What it does while running:
+  - Builds index.html and saves a commit (ready to push).
+  - Watches your Downloads folder. When Claude sends you a new
+    wedding_invite.py (or index.html) and you download it, it moves it into
+    this folder, rebuilds the site and commits it.
+  - You then click "Push origin" in GitHub Desktop. That's it.
+
+Your details (names, date, venues...) live in details.json next to this file,
+so design updates from Claude never overwrite them.
+
+Site: https://manohar1008303.github.io/Manohar-Wedding/
+Stop with Ctrl + C.
+"""
+
+import html
+import json
+import re
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+OUT = HERE / "index.html"
+DETAILS_FILE = HERE / "details.json"
+DOWNLOADS = Path.home() / "Downloads"
+SITE = "https://manohar1008303.github.io/Manohar-Wedding/"
+CHECK_EVERY = 2  # seconds
+
+# Default details: used only the first time, to create details.json.
+DEFAULT_DETAILS = {
+    "groom": "Manohar",
+    "bride": "Dhanashri",
+    "weddingDateISO": "2027-02-14T10:30:00+05:30",
+    "dateText": "Date to be confirmed",
+    "timeText": "[Muhurat time]",
+    "town": "Venue, Town",
+    "venueName": "[Venue name]",
+    "mapQuery": "[Venue name, Town]",
+    "rsvpWhatsApp": "",
+    "dressWomen": "Sarees or lehengas in lilac, blush or ivory.",
+    "dressMen": "Kurta in ivory, lilac or beige.",
+    "story": [
+        {"when": "[Year]", "title": "How we met", "text": "A few lines about the day you first met."},
+        {"when": "[Year]", "title": "The question", "text": "A few lines about the proposal or the families meeting."},
+        {"when": "[Wedding date]", "title": "Forever begins", "text": "A few lines about this new chapter."},
+    ],
+    "events": [
+        {"name": "Mehendi", "when": "[Date] · [Time]", "venue": "[Venue name, Town]"},
+        {"name": "Vinayakyantra Puja", "when": "[Date] · [Time]", "venue": "[Venue name, Town]"},
+        {"name": "Phere", "when": "[Date] · [Muhurat time]", "venue": "[Venue name, Town]"},
+        {"name": "Reception", "when": "[Date] · [Time]", "venue": "[Venue name, Town]"},
+    ],
+    "foodNote": "Pure Jain bhojan will be served. Meals are planned before sunset.",
+}
+
+INVITE_FILE = re.compile(r"^(wedding_invite|index|wedding-invite)( ?\(?\d+\)?|[-_ ]\d+)?\.(py|html)$", re.I)
+
+
+def load_details() -> dict:
+    if not DETAILS_FILE.exists():
+        DETAILS_FILE.write_text(json.dumps(DEFAULT_DETAILS, ensure_ascii=False, indent=2), encoding="utf-8")
+        print("Created details.json (edit your names, dates and venues there).")
+    details = dict(DEFAULT_DETAILS)
+    details.update(json.loads(DETAILS_FILE.read_text(encoding="utf-8")))
+    return details
+
+
+def build() -> None:
+    d = load_details()
+    page = TEMPLATE.replace("__CONFIG_JSON__", json.dumps(d, ensure_ascii=False, indent=2).replace("</", "<\\/"))
+    extras = {"groomInitial": d["groom"][:1].upper(), "brideInitial": d["bride"][:1].upper()}
+    for key, value in {**d, **extras}.items():
+        if isinstance(value, str):
+            page = page.replace("{{" + key + "}}", html.escape(value, quote=False))
+    OUT.write_text(page, encoding="utf-8")
+    print(f"Built index.html for {d['groom']} & {d['bride']}.")
+
+
+def git(*args):
+    try:
+        return subprocess.run(["git", "-C", str(HERE), *args], capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+
+
+def commit(message: str) -> None:
+    if not (HERE / ".git").exists():
+        print("This folder isn't your GitHub repository. Move this file into Manohar-Wedding")
+        print("(GitHub Desktop > Repository > Show in Finder) and run it again.")
+        return
+    if git("add", "index.html", "details.json", Path(__file__).name) is None:
+        print("Git isn't available in Terminal. Use GitHub Desktop: Commit to main > Push origin.")
+        return
+    result = git("commit", "-m", message)
+    text = (result.stdout + result.stderr) if result else ""
+    if any(k in text for k in ("nothing to commit", "nothing added to commit", "no changes added to commit")):
+        print("No changes to publish.")
+    elif result and result.returncode == 0:
+        print("Ready! Open GitHub Desktop and click 'Push origin'.")
+        print(f"Site updates 1-2 minutes after pushing: {SITE}")
+    else:
+        print("Couldn't commit automatically. In GitHub Desktop: Commit to main > Push origin.")
+
+
+def finished(path: Path) -> bool:
+    last = -1
+    for _ in range(30):
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            return False
+        if size == last and size > 0:
+            return True
+        last = size
+        time.sleep(1)
+    return False
+
+
+def handle_download(path: Path) -> None:
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    if "Dhanashri" not in text and "__CONFIG_JSON__" not in text:
+        print(f"Skipped {path.name} (not the wedding invite).")
+        return
+    if path.suffix.lower() == ".py":
+        target = HERE / Path(__file__).name
+        shutil.move(str(path), str(target))
+        print(f"New design received ({path.name}). Rebuilding...")
+        subprocess.run([sys.executable, str(target), "--once"])
+    else:
+        shutil.move(str(path), str(OUT))
+        print(f"New index.html received ({path.name}).")
+        commit("Update wedding invite")
+
+
+def watch() -> None:
+    print("\nWatching Downloads for updates from Claude... (Ctrl + C to stop)\n")
+    started, seen = time.time(), set()
+    while True:
+        for path in DOWNLOADS.iterdir():
+            if not (path.is_file() and INVITE_FILE.match(path.name)):
+                continue
+            try:
+                mtime = path.stat().st_mtime
+            except FileNotFoundError:
+                continue
+            key = (path.name, mtime)
+            if mtime < started or key in seen:
+                continue
+            seen.add(key)
+            if finished(path):
+                handle_download(path)
+        time.sleep(CHECK_EVERY)
+
+
+def main() -> None:
+    build()
+    commit("Update wedding invite")
+    if "--once" not in sys.argv:
+        watch()
+
+
+
+
+# =====================================================================
+#  Invite design (made with Claude). Ask Claude for design changes.
+# =====================================================================
+TEMPLATE = r'''<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="invite-version" content="curtains-v3">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Manohar &amp; Dhanashri · Wedding Invitation</title>
+<title>{{groom}} &amp; {{bride}} · Wedding Invitation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Great+Vibes&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
@@ -253,7 +428,7 @@ footer .script{font-family:"Great Vibes",cursive;font-size:56px;margin:8px 0}
 
 <div id="intro" role="dialog" aria-label="Wedding invitation entrance">
   <p class="invited">You are cordially invited</p>
-  <p class="mono foil">M &amp; D</p>
+  <p class="mono foil">{{groomInitial}} &amp; {{brideInitial}}</p>
   <div class="gate" id="gate">
     <div class="gate-frame"></div>
     <div class="light"></div>
@@ -346,9 +521,9 @@ footer .script{font-family:"Great Vibes",cursive;font-size:56px;margin:8px 0}
       <div class="scene-text">
         <p class="jj foil unveil u1">|| Jai Jinendra ||</p>
         <p class="we unveil u2">We're getting married</p>
-        <p class="nm foil unveil u3" data-k="groom">Manohar</p>
+        <p class="nm foil unveil u3" data-k="groom">{{groom}}</p>
         <p class="amp unveil u4">&amp;</p>
-        <p class="nm foil unveil u5" data-k="bride" style="margin-top:0">Dhanashri</p>
+        <p class="nm foil unveil u5" data-k="bride" style="margin-top:0">{{bride}}</p>
       </div>
     </div>
     <div class="scroll-cue">Scroll ↓</div>
@@ -363,9 +538,9 @@ footer .script{font-family:"Great Vibes",cursive;font-size:56px;margin:8px 0}
       <div class="scratch">
         <div class="reveal-card">
           <svg class="icon" width="34" height="34"><use href="#lotus"/></svg>
-          <div class="d foil" data-k="dateText">Date to be confirmed</div>
-          <div class="t" data-k="timeText">[Muhurat time]</div>
-          <div class="t" data-k="town">Venue, Town</div>
+          <div class="d foil" data-k="dateText">{{dateText}}</div>
+          <div class="t" data-k="timeText">{{timeText}}</div>
+          <div class="t" data-k="town">{{town}}</div>
         </div>
         <canvas id="scratchCanvas" aria-label="Gold scratch area. Scratch to reveal the date"></canvas>
       </div>
@@ -418,7 +593,7 @@ footer .script{font-family:"Great Vibes",cursive;font-size:56px;margin:8px 0}
     <div class="wrap">
       <div class="rv"><p class="kicker">Programme</p><h2 class="foil">Wedding timeline</h2><svg class="divider"><use href="#div"/></svg><p class="lead">We would love to have you with us at every function.</p></div>
       <div class="timeline rv" id="eventList"><span class="rail"></span></div>
-      <p class="food lux rv" data-k="foodNote">Pure Jain bhojan will be served. Meals are planned before sunset.</p>
+      <p class="food lux rv" data-k="foodNote">{{foodNote}}</p>
     </div>
   </section>
 
@@ -426,8 +601,8 @@ footer .script{font-family:"Great Vibes",cursive;font-size:56px;margin:8px 0}
     <div class="wrap">
       <div class="rv"><p class="kicker">What to wear</p><h2 class="foil">Dress code</h2><svg class="divider"><use href="#div"/></svg><p class="lead">A little guide to match the celebrations.</p></div>
       <div class="dress rv">
-        <div class="lux"><p class="kicker">Women</p><h3>Graceful pastels</h3><p data-k="dressWomen">Sarees or lehengas in lilac, blush or ivory.</p><div class="swatches"><span style="background:#cbbde8"></span><span style="background:#f2c6d6"></span><span style="background:#f4e7c6"></span></div></div>
-        <div class="lux"><p class="kicker">Men</p><h3>Classic kurta</h3><p data-k="dressMen">Kurta in ivory, lilac or beige.</p><div class="swatches"><span style="background:#f7f2e8"></span><span style="background:#b7a6da"></span><span style="background:#d9c7a3"></span></div></div>
+        <div class="lux"><p class="kicker">Women</p><h3>Graceful pastels</h3><p data-k="dressWomen">{{dressWomen}}</p><div class="swatches"><span style="background:#cbbde8"></span><span style="background:#f2c6d6"></span><span style="background:#f4e7c6"></span></div></div>
+        <div class="lux"><p class="kicker">Men</p><h3>Classic kurta</h3><p data-k="dressMen">{{dressMen}}</p><div class="swatches"><span style="background:#f7f2e8"></span><span style="background:#b7a6da"></span><span style="background:#d9c7a3"></span></div></div>
       </div>
     </div>
   </section>
@@ -435,7 +610,7 @@ footer .script{font-family:"Great Vibes",cursive;font-size:56px;margin:8px 0}
   <section id="venue">
     <div class="wrap rv">
       <p class="kicker">Venue</p><h2 class="foil">Where we celebrate</h2><svg class="divider"><use href="#div"/></svg>
-      <p class="lead"><strong data-k="venueName" style="color:#efe4ff;font-weight:500">[Venue name]</strong><br><span data-k="town">Venue, Town</span></p>
+      <p class="lead"><strong data-k="venueName" style="color:#efe4ff;font-weight:500">{{venueName}}</strong><br><span data-k="town">{{town}}</span></p>
       <a class="btn" id="mapBtn" target="_blank" rel="noopener">View on Google Maps</a>
     </div>
   </section>
@@ -460,8 +635,8 @@ footer .script{font-family:"Great Vibes",cursive;font-size:56px;margin:8px 0}
     <svg class="icon" width="36" height="40"><use href="#jainsw"/></svg>
     <p class="kicker">|| Jai Jinendra ||</p>
     <p style="margin:0">With love and blessings of our families</p>
-    <p class="script foil"><span data-k="groom">Manohar</span> &amp; <span data-k="bride">Dhanashri</span></p>
-    <p data-k="dateText">Date to be confirmed</p>
+    <p class="script foil"><span data-k="groom">{{groom}}</span> &amp; <span data-k="bride">{{bride}}</span></p>
+    <p data-k="dateText">{{dateText}}</p>
   </footer>
 </main>
 
@@ -469,59 +644,7 @@ footer .script{font-family:"Great Vibes",cursive;font-size:56px;margin:8px 0}
 
 <script>
 /* ===== Edit these details once finalised ===== */
-const CONFIG={
-  "groom": "Manohar",
-  "bride": "Dhanashri",
-  "weddingDateISO": "2027-02-14T10:30:00+05:30",
-  "dateText": "Date to be confirmed",
-  "timeText": "[Muhurat time]",
-  "town": "Venue, Town",
-  "venueName": "[Venue name]",
-  "mapQuery": "[Venue name, Town]",
-  "rsvpWhatsApp": "",
-  "dressWomen": "Sarees or lehengas in lilac, blush or ivory.",
-  "dressMen": "Kurta in ivory, lilac or beige.",
-  "story": [
-    {
-      "when": "[Year]",
-      "title": "How we met",
-      "text": "A few lines about the day you first met."
-    },
-    {
-      "when": "[Year]",
-      "title": "The question",
-      "text": "A few lines about the proposal or the families meeting."
-    },
-    {
-      "when": "[Wedding date]",
-      "title": "Forever begins",
-      "text": "A few lines about this new chapter."
-    }
-  ],
-  "events": [
-    {
-      "name": "Mehendi",
-      "when": "[Date] · [Time]",
-      "venue": "[Venue name, Town]"
-    },
-    {
-      "name": "Vinayakyantra Puja",
-      "when": "[Date] · [Time]",
-      "venue": "[Venue name, Town]"
-    },
-    {
-      "name": "Phere",
-      "when": "[Date] · [Muhurat time]",
-      "venue": "[Venue name, Town]"
-    },
-    {
-      "name": "Reception",
-      "when": "[Date] · [Time]",
-      "venue": "[Venue name, Town]"
-    }
-  ],
-  "foodNote": "Pure Jain bhojan will be served. Meals are planned before sunset."
-};
+const CONFIG=__CONFIG_JSON__;
 /* ============================================= */
 (function(){
   document.body.classList.add('locked');
@@ -660,3 +783,11 @@ const CONFIG={
 </script>
 </body>
 </html>
+'''
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nStopped.")

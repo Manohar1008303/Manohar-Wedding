@@ -1,0 +1,53 @@
+{
+  "groom": "Manohar",
+  "bride": "Dhanashri",
+  "weddingDateISO": "2027-02-14T10:30:00+05:30",
+  "dateText": "Date to be confirmed",
+  "timeText": "[Muhurat time]",
+  "town": "Venue, Town",
+  "venueName": "[Venue name]",
+  "mapQuery": "[Venue name, Town]",
+  "rsvpWhatsApp": "",
+  "dressWomen": "Sarees or lehengas in lilac, blush or ivory.",
+  "dressMen": "Kurta in ivory, lilac or beige.",
+  "story": [
+    {
+      "when": "[Year]",
+      "title": "How we met",
+      "text": "A few lines about the day you first met."
+    },
+    {
+      "when": "[Year]",
+      "title": "The question",
+      "text": "A few lines about the proposal or the families meeting."
+    },
+    {
+      "when": "[Wedding date]",
+      "title": "Forever begins",
+      "text": "A few lines about this new chapter."
+    }
+  ],
+  "events": [
+    {
+      "name": "Mehendi",
+      "when": "[Date] · [Time]",
+      "venue": "[Venue name, Town]"
+    },
+    {
+      "name": "Vinayakyantra Puja",
+      "when": "[Date] · [Time]",
+      "venue": "[Venue name, Town]"
+    },
+    {
+      "name": "Phere",
+      "when": "[Date] · [Muhurat time]",
+      "venue": "[Venue name, Town]"
+    },
+    {
+      "name": "Reception",
+      "when": "[Date] · [Time]",
+      "venue": "[Venue name, Town]"
+    }
+  ],
+  "foodNote": "Pure Jain bhojan will be served. Meals are planned before sunset."
+}
