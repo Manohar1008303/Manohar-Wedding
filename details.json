@@ -10,6 +10,9 @@
   "rsvpWhatsApp": "",
   "dressWomen": "Sarees or lehengas in lilac, blush or ivory.",
   "dressMen": "Kurta in ivory, lilac or beige.",
+  "groomParents": "Mr. [Father's name] & Mrs. [Mother's name]",
+  "brideParents": "Mr. [Father's name] & Mrs. [Mother's name]",
+  "guestNote": "Your presence and blessings mean the world to us. We can't wait to celebrate this new beginning with you.",
   "story": [
     {
       "when": "[Year]",
